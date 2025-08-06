@@ -2,123 +2,206 @@ package com.ryan.docu.service.generators;
 
 import com.ryan.docu.model.dto.DocumentCreateDTO;
 import com.ryan.docu.model.enums.Format;
-import org.apache.pdfbox.Loader;
+import com.ryan.docu.service.generators.styles.ApaFormatter;
+import com.ryan.docu.service.generators.styles.MlaFormatter;
+import com.ryan.docu.service.generators.styles.StyleFormatter;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class PdfGeneratorService {
 
-    private static final String TEMPLATE_BASE_PATH = "templates/";
-    private static final float MARGIN = 72;
-    private static final float DOUBLE_SPACE = 28;
+    private static final float MARGIN = 72; // 1 inch
+    private static final float DOUBLE_SPACE = 24;
+    private static final float PARAGRAPH_INDENT = 36; // 0.5 inch first line indent
+    private static final float FONT_SIZE = 12;
+    private static final PDType1Font FONT = new PDType1Font(Standard14Fonts.FontName.TIMES_ROMAN);
 
-    public byte[] generatePDF(DocumentCreateDTO documentData) throws IOException {
-        try (PDDocument doc = loadTemplate(documentData)) {
-            fillTemplate(doc, documentData);
-            return convertToByteArray(doc);
-        }
-    }
+    private final Map<Format, StyleFormatter> formatters;
 
-    private PDDocument loadTemplate(DocumentCreateDTO data) {
-        String templatePath = getTemplatePath(data);
-        try {
-            // Try to load from classpath (src/main/resources)
-            ClassPathResource resource = new ClassPathResource(templatePath);
-            if (resource.exists()) {
-                try (InputStream inputStream = resource.getInputStream()) {
-                    byte[] pdfBytes = inputStream.readAllBytes();
-                    return Loader.loadPDF(pdfBytes);
-                }
-            }
-        } catch (IOException e) {
-            System.err.println("Could not load template from classpath: " + e.getMessage());
-        }
-        return createNewDocument();
-    }
-
-    private String getTemplatePath(DocumentCreateDTO data) {
-        Format format = data.getFormat();
-        if (format == null) {
-            return TEMPLATE_BASE_PATH + "MLA-Template.pdf";
-        }
-        return switch (format) {
-            case APA -> TEMPLATE_BASE_PATH + "APA-Template.pdf";
-            case HARVARD -> TEMPLATE_BASE_PATH + "Harvard-Template.pdf";
-            case CHICAGO -> TEMPLATE_BASE_PATH + "Chicago-Template.pdf";
-            default -> TEMPLATE_BASE_PATH + "MLA-Template.pdf";
-        };
-    }
-
-    private PDDocument createNewDocument() {
-        PDDocument document = new PDDocument();
-        PDPage page = new PDPage();
-        document.addPage(page);
-        return document;
+    public PdfGeneratorService() {
+        formatters = new HashMap<>();
+        formatters.put(Format.MLA, new MlaFormatter());
+        formatters.put(Format.APA, new ApaFormatter());
     }
 
     /**
-     * Fills the template with data from DocumentCreateDTO
-     * @param document The PDF document to fill
-     * @param data The data to insert
-     * @throws IOException if writing to PDF fails
+     * Generates a PDF from a DocumentCreateDTO
      */
-    private void fillTemplate(PDDocument document, DocumentCreateDTO data) throws IOException {
-        // Process all pages in the document
-        for (int pageIndex = 0; pageIndex < document.getNumberOfPages(); pageIndex++) {
-            PDPage page = document.getPage(pageIndex);
-            try (PDPageContentStream contentStream = new PDPageContentStream(
-                    document, page, PDPageContentStream.AppendMode.APPEND, true, true)) { // Changed to APPEND
+    public byte[] generatePDF(DocumentCreateDTO document) throws IOException {
+        try (PDDocument pdfDocument = new PDDocument()) {
+            PDPage page1 = new PDPage();
+            pdfDocument.addPage(page1);
 
-                // Set font for the document
-                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.TIMES_ROMAN), 12);
+            // Write main content to first page
+            float finalYPosition;
+            try (PDPageContentStream contentStream = new PDPageContentStream(pdfDocument, page1)) {
+                contentStream.setFont(FONT, FONT_SIZE);
 
-                if (pageIndex == 0) {
-                    // First page - add header and title
-                    float yPosition = page.getMediaBox().getHeight() - MARGIN;
+                float yPosition = page1.getMediaBox().getHeight() - MARGIN;
 
-                    // Update the header numbering (replace [NAME] 1 with actual name)
-                    updateHeaderNumbering(contentStream, data, page, pageIndex + 1);
+                // Header numbering
+                writeHeaderNumber(contentStream, document, page1, 1);
 
-                    // Header (top-left corner)
-                    yPosition = writeHeader(contentStream, data, yPosition);
+                // Writes the Header for the Student.
+                yPosition = writeStudentInfo(
+                        contentStream, document, yPosition, page1.getMediaBox().getWidth());
 
-                    // Title (centered)
-                    writeTitle(
-                            contentStream, data, yPosition, page.getMediaBox().getWidth());
+                // Body text with proper formatting
+                if (document.getBodyText() != null
+                        && !document.getBodyText().trim().isEmpty()) {
+                    finalYPosition = writeBodyText(pdfDocument, contentStream, document, yPosition);
                 } else {
-                    // Other pages - just update header numbering
-                    updateHeaderNumbering(contentStream, data, page, pageIndex + 1);
+                    // Default placeholder if no body text provided
+                    yPosition -= DOUBLE_SPACE;
+                    contentStream.beginText();
+                    contentStream.newLineAtOffset(MARGIN + PARAGRAPH_INDENT, yPosition);
+                    contentStream.showText("Your text goes here! Add content to the bodyText field.");
+                    contentStream.endText();
+                    finalYPosition = yPosition;
                 }
+            } // contentStream is automatically closed here
+
+            // Add Works Cited page - AFTER the main content stream is closed
+            addWorksCitedPage(pdfDocument, document, finalYPosition);
+
+            return convertToByteArray(pdfDocument);
+        }
+    }
+
+    /**
+     * Fixed method to add Works Cited page without stream conflicts
+     */
+    private void addWorksCitedPage(PDDocument pdfDocument, DocumentCreateDTO document, float lastYPosition)
+            throws IOException {
+        PDPage lastPage = pdfDocument.getPage(pdfDocument.getNumberOfPages() - 1);
+
+        // Check if we have enough space on the last page for Works Cited
+        float requiredSpace = DOUBLE_SPACE * 8; // Minimum space needed for Works Cited
+        boolean needsNewPage = lastYPosition < (MARGIN + requiredSpace);
+
+        if (needsNewPage) {
+            // Create new page for Works Cited
+            PDPage newPage = new PDPage();
+            pdfDocument.addPage(newPage);
+
+            try (PDPageContentStream contentStream = new PDPageContentStream(pdfDocument, newPage)) {
+                contentStream.setFont(FONT, FONT_SIZE);
+
+                float yPosition = newPage.getMediaBox().getHeight() - MARGIN;
+                writeHeaderNumber(contentStream, document, newPage, pdfDocument.getNumberOfPages());
+                yPosition -= DOUBLE_SPACE * 2;
+                writeWorksCited(contentStream, yPosition, document.getFormat());
+            }
+        } else {
+            // Add to existing last page
+            try (PDPageContentStream contentStream =
+                    new PDPageContentStream(pdfDocument, lastPage, PDPageContentStream.AppendMode.APPEND, true)) {
+                contentStream.setFont(FONT, FONT_SIZE);
+
+                float yPosition = lastYPosition - (DOUBLE_SPACE * 3); // Add some space
+                writeWorksCited(contentStream, yPosition, document.getFormat());
             }
         }
     }
 
     /**
-     * Updates the header numbering to replace [NAME] with actual name
+     * Modified writeBodyText method to return final Y position and handle streams properly
      */
-    private void updateHeaderNumbering(
-            PDPageContentStream contentStream, DocumentCreateDTO data, PDPage page, int pageNumber) throws IOException {
-        String name = getValueOrDefault(data.getName(), "[INSERT NAME]");
+    private float writeBodyText(
+            PDDocument document, PDPageContentStream contentStream, DocumentCreateDTO doc, float startY)
+            throws IOException {
+        String bodyText = doc.getBodyText();
+        if (bodyText == null || bodyText.trim().isEmpty()) {
+            return startY;
+        }
+        contentStream.setFont(FONT, FONT_SIZE);
+
+        // Split on newlines
+        String[] paragraphs = bodyText.split("\n+");
+
+        // Filter out empty paragraphs and trim whitespace
+        List<String> validParagraphs = new ArrayList<>();
+        for (String paragraph : paragraphs) {
+            String trimmed = paragraph.trim();
+            if (!trimmed.isEmpty()) {
+                validParagraphs.add(trimmed);
+            }
+        }
+
+        float yPosition = startY - DOUBLE_SPACE;
+        PDPage currentPage = document.getPage(0); // Start with first page
+        PDPageContentStream currentStream = contentStream;
+        boolean isOriginalStream = true;
+
+        for (String paragraph : validParagraphs) {
+            // Check if we need a new page
+            int estimatedLines =
+                    estimateParagraphLines(paragraph, currentPage.getMediaBox().getWidth());
+            float estimatedHeight = estimatedLines * DOUBLE_SPACE;
+
+            if (yPosition - estimatedHeight < MARGIN + (DOUBLE_SPACE * 3)) {
+                // Close current stream only if it's not the original one
+                if (!isOriginalStream) {
+                    currentStream.close();
+                }
+
+                // Create new page
+                PDPage newPage = new PDPage();
+                document.addPage(newPage);
+                currentPage = newPage;
+
+                // Create new stream for the new page
+                currentStream = new PDPageContentStream(document, currentPage);
+                currentStream.setFont(FONT, FONT_SIZE);
+                isOriginalStream = false;
+
+                // Add header to new page
+                writeHeaderNumber(currentStream, doc, currentPage, document.getNumberOfPages());
+                yPosition = currentPage.getMediaBox().getHeight() - MARGIN - (DOUBLE_SPACE * 2);
+            }
+
+            // Write paragraph
+            boolean shouldIndent = doc.getFormat() == Format.MLA || doc.getFormat() == null;
+            yPosition = writeParagraph(
+                    currentStream,
+                    paragraph,
+                    yPosition,
+                    currentPage.getMediaBox().getWidth(),
+                    shouldIndent);
+        }
+
+        // Close additional streams, but not the original one (it will be closed by try-with-resources)
+        if (!isOriginalStream) {
+            currentStream.close();
+        }
+
+        return yPosition;
+    }
+
+    private void writeHeaderNumber(
+            PDPageContentStream contentStream, DocumentCreateDTO document, PDPage page, int pageNumber)
+            throws IOException {
+        String name = getValueOrDefault(document.getName(), "[NAME]");
         String lastName = getLastName(name);
 
-        // Position for header numbering (top-right corner)
         float pageWidth = page.getMediaBox().getWidth();
         String headerText = lastName + " " + pageNumber;
 
-        float headerWidth =
-                new PDType1Font(Standard14Fonts.FontName.TIMES_ROMAN).getStringWidth(headerText) / 1000 * 12;
+        float headerWidth = FONT.getStringWidth(headerText) / 1000 * FONT_SIZE;
         float headerX = pageWidth - MARGIN - headerWidth;
-        float headerY = page.getMediaBox().getHeight() - MARGIN + 15; // Slightly above the margin
+        float headerY = page.getMediaBox().getHeight() - MARGIN + 15;
 
         contentStream.beginText();
         contentStream.newLineAtOffset(headerX, headerY);
@@ -126,72 +209,156 @@ public class PdfGeneratorService {
         contentStream.endText();
     }
 
-    /**
-     * Extracts last name from full name
-     */
-    private String getLastName(String fullName) {
-        if (fullName == null || fullName.trim().isEmpty() || fullName.equals("[INSERT NAME]")) {
-            return "[NAME]";
+    private float writeStudentInfo(
+            PDPageContentStream contentStream, DocumentCreateDTO document, float yPosition, float pageWidth)
+            throws IOException {
+        Format format = document.getFormat() != null ? document.getFormat() : Format.MLA;
+        StyleFormatter formatter = formatters.get(format);
+
+        if (formatter != null) {
+            return formatter.writeHeader(contentStream, document, yPosition, pageWidth);
+        } else {
+            return formatters.get(Format.MLA).writeHeader(contentStream, document, yPosition, pageWidth);
         }
-
-        String[] nameParts = fullName.trim().split("\\s+");
-        return nameParts.length > 1 ? nameParts[nameParts.length - 1] : nameParts[0];
     }
 
-    private float writeHeader(PDPageContentStream contentStream, DocumentCreateDTO data, float yPosition)
-            throws IOException {
-        // Name
-        contentStream.beginText();
-        contentStream.newLineAtOffset(MARGIN, yPosition);
-        contentStream.showText(getValueOrDefault(data.getName(), "[INSERT NAME]"));
-        contentStream.endText();
-        yPosition -= DOUBLE_SPACE;
+    private void writeWorksCited(PDPageContentStream contentStream, float startY, Format format) throws IOException {
+        float yPosition = startY;
 
-        // Instructor Name
-        contentStream.beginText();
-        contentStream.newLineAtOffset(MARGIN, yPosition);
-        contentStream.showText(getValueOrDefault(data.getProfessorName(), "[INSERT INSTRUCTOR NAME]"));
-        contentStream.endText();
-        yPosition -= DOUBLE_SPACE;
-
-        // Class Name
-        contentStream.beginText();
-        contentStream.newLineAtOffset(MARGIN, yPosition);
-        contentStream.showText(getValueOrDefault(data.getClassTitle(), "[CLASS NAME]"));
-        contentStream.endText();
-        yPosition -= DOUBLE_SPACE;
-
-        // Date
-        contentStream.beginText();
-        contentStream.newLineAtOffset(MARGIN, yPosition);
-        String dateStr = getValueOrDefault(data.getDate(), "[DATE]");
-        contentStream.showText(dateStr);
-        contentStream.endText();
-        yPosition -= DOUBLE_SPACE * 2; // Extra space before title
-
-        return yPosition;
-    }
-
-    /**
-     * Writes the centered title
-     */
-    private void writeTitle(PDPageContentStream contentStream, DocumentCreateDTO data, float yPosition, float pageWidth)
-            throws IOException {
-        String title = getValueOrDefault(data.getTitle(), "[TITLE]");
-
-        // Calculate center position
-        float titleWidth = new PDType1Font(Standard14Fonts.FontName.TIMES_ROMAN).getStringWidth(title) / 1000 * 12;
+        // Works Cited title - centered
+        String citationTitle = getCitationTitle(format);
+        float pageWidth = 612; // Standard letter width
+        float titleWidth = FONT.getStringWidth(citationTitle) / 1000 * FONT_SIZE;
         float centerX = (pageWidth - titleWidth) / 2;
 
         contentStream.beginText();
         contentStream.newLineAtOffset(centerX, yPosition);
-        contentStream.showText(title);
+        contentStream.showText(citationTitle);
         contentStream.endText();
+        yPosition -= DOUBLE_SPACE * 2;
+
+        // Citation examples
+        String[] citations = getCitationExamples(format);
+        for (String citation : citations) {
+            // Handle long citations that might need wrapping
+            if (citation.length() > 80) { // Rough estimate for line length
+                List<String> wrappedLines = wrapText(citation, 612 - (2 * MARGIN), false);
+                for (String line : wrappedLines) {
+                    contentStream.beginText();
+                    contentStream.newLineAtOffset(MARGIN, yPosition);
+                    contentStream.showText(line);
+                    contentStream.endText();
+                    yPosition -= DOUBLE_SPACE;
+                }
+            } else {
+                contentStream.beginText();
+                contentStream.newLineAtOffset(MARGIN, yPosition);
+                contentStream.showText(citation);
+                contentStream.endText();
+                yPosition -= DOUBLE_SPACE;
+            }
+        }
     }
 
-    /**
-     * Converts PDDocument to bytearray
-     */
+    private String getCitationTitle(Format format) {
+        if (format == null) format = Format.MLA;
+        StyleFormatter formatter = formatters.get(format);
+        return formatter != null ? formatter.getCitationTitle() : "Works Cited";
+    }
+
+    private String[] getCitationExamples(Format format) {
+        if (format == null) format = Format.MLA;
+        StyleFormatter formatter = formatters.get(format);
+        return formatter != null ? formatter.getCitationExamples() : new String[0];
+    }
+
+    private int estimateParagraphLines(String text, float pageWidth) throws IOException {
+        float maxWidthFirstLine = pageWidth - (2 * MARGIN) - PARAGRAPH_INDENT;
+        float maxWidthRegular = pageWidth - (2 * MARGIN);
+        String[] words = text.split("\\s+");
+
+        int lines = 1;
+        float currentLineWidth = 0;
+        boolean isFirstLine = true;
+
+        for (String word : words) {
+            float wordWidth = FONT.getStringWidth(word + " ") / 1000 * FONT_SIZE;
+            float currentMaxWidth = isFirstLine ? maxWidthFirstLine : maxWidthRegular;
+
+            if (currentLineWidth + wordWidth > currentMaxWidth) {
+                lines++;
+                currentLineWidth = wordWidth;
+                isFirstLine = false;
+            } else {
+                currentLineWidth += wordWidth;
+            }
+        }
+        return lines;
+    }
+
+    private float writeParagraph(
+            PDPageContentStream contentStream, String text, float startY, float pageWidth, boolean indentFirstLine)
+            throws IOException {
+        float maxWidth = pageWidth - (2 * MARGIN);
+        List<String> lines = wrapText(text, maxWidth, indentFirstLine);
+        float yPosition = startY;
+
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            float xPosition = MARGIN;
+
+            if (i == 0 && indentFirstLine) {
+                xPosition += PARAGRAPH_INDENT;
+            }
+
+            contentStream.beginText();
+            contentStream.newLineAtOffset(xPosition, yPosition);
+            contentStream.showText(line);
+            contentStream.endText();
+
+            yPosition -= DOUBLE_SPACE;
+        }
+        return yPosition;
+    }
+
+    private List<String> wrapText(String text, float maxWidth, boolean hasIndent) throws IOException {
+        List<String> lines = new ArrayList<>();
+        String[] words = text.split("\\s+");
+        StringBuilder currentLine = new StringBuilder();
+        boolean isFirstLine = true;
+
+        for (String word : words) {
+            String testLine = currentLine.isEmpty() ? word : currentLine + " " + word;
+            float effectiveMaxWidth = (isFirstLine && hasIndent) ? maxWidth - PARAGRAPH_INDENT : maxWidth;
+            float textWidth = FONT.getStringWidth(testLine) / 1000 * FONT_SIZE;
+
+            if (textWidth <= effectiveMaxWidth) {
+                currentLine.append(currentLine.isEmpty() ? word : " " + word);
+            } else {
+                if (!currentLine.isEmpty()) {
+                    lines.add(currentLine.toString());
+                    currentLine = new StringBuilder(word);
+                } else {
+                    lines.add(word);
+                }
+                isFirstLine = false;
+            }
+        }
+
+        if (!currentLine.isEmpty()) {
+            lines.add(currentLine.toString());
+        }
+        return lines;
+    }
+
+    private String getLastName(String fullName) {
+        if (fullName == null || fullName.trim().isEmpty() || fullName.equals("[INSERT NAME]")) {
+            return "[NAME]";
+        }
+        String[] nameParts = fullName.trim().split("\\s+");
+        return nameParts.length > 1 ? nameParts[nameParts.length - 1] : nameParts[0];
+    }
+
     private byte[] convertToByteArray(PDDocument document) throws IOException {
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             document.save(outputStream);
@@ -199,9 +366,6 @@ public class PdfGeneratorService {
         }
     }
 
-    /**
-     * Helper method to provide default values for null fields
-     */
     private String getValueOrDefault(String value, String defaultValue) {
         return value != null && !value.trim().isEmpty() ? value : defaultValue;
     }

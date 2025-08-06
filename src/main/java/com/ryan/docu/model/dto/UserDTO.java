@@ -1,6 +1,5 @@
 package com.ryan.docu.model.dto;
 
-import com.ryan.docu.model.Document;
 import lombok.Data;
 
 import java.util.List;
