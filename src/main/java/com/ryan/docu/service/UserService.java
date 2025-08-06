@@ -19,7 +19,6 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private final UserRepo userRepo;
-
     private final UserMapper userMapper;
 
     public UserDTO createUser(UserCreateDTO userCreateDTO) {
@@ -39,7 +38,7 @@ public class UserService {
         userRepo.deleteById(id);
     }
 
-    // Helper method for other class functions
+    // Helper method for Document Service class functions
     public User findEntityById(UUID id) {
         return userRepo.findById(id).orElse(null);
     }

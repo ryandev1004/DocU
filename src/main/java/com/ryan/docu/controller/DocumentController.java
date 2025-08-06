@@ -60,8 +60,12 @@ public class DocumentController {
     private String getFileName(DocumentCreateDTO document) {
         if (document.getTitle() != null && !document.getTitle().trim().isEmpty()) {
             // Clean the title for use as filename (remove special characters)
-            return document.getTitle().replaceAll("[^a-zA-Z0-9\\s]", "").replaceAll("\\s+", "_");
+            String cleaned = document.getTitle()
+                    .replaceAll("[^a-zA-Z0-9\\s]", "")
+                    .replaceAll("\\s+", "_")
+                    .trim();
+            return cleaned.isEmpty() ? "Document" : cleaned;
         }
-        return "MLA_Document";
+        return "Document";
     }
 }

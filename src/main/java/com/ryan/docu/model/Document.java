@@ -1,6 +1,5 @@
 package com.ryan.docu.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.ryan.docu.model.enums.FileType;
 import com.ryan.docu.model.enums.Format;
 import jakarta.persistence.*;
@@ -26,11 +25,15 @@ public class Document {
     private String classTitle;
     private String instituteName;
     private String date;
-    
+
+    @Column(columnDefinition = "TEXT")
+    private String bodyText;
+
     private Instant timeCreated;
 
     @Enumerated(EnumType.STRING)
     private Format format;
+
     @Enumerated(EnumType.STRING)
     private FileType fileType;
 
@@ -44,5 +47,4 @@ public class Document {
     public void prePersist() {
         timeCreated = Instant.now();
     }
-
 }
