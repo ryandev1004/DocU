@@ -27,12 +27,21 @@ public class DocumentController {
         byte[] documentBytes = documentService.generateDocument(userId, document);
 
         HttpHeaders headers = new HttpHeaders();
-        if (document.getFileType().name().equals("PDF")) {
-            headers.setContentType(MediaType.APPLICATION_PDF);
-            headers.setContentDispositionFormData("attachment", getFileName(document) + ".pdf");
-        } else if (document.getFileType().name().equals("DOCX")) {
-            return ResponseEntity.ok(null);
-        }
+
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", getFileName(document) + ".pdf");
+        headers.setContentLength(documentBytes.length);
+
+        return ResponseEntity.ok().headers(headers).body(documentBytes);
+    }
+
+    @GetMapping("/generate/{userId}/{docId}")
+    public ResponseEntity<byte[]> loadDocument(@PathVariable UUID userId, @PathVariable UUID docId) throws IOException {
+        byte[] documentBytes = documentService.loadDocument(userId, docId);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "document_" + docId + ".pdf");
         headers.setContentLength(documentBytes.length);
 
         return ResponseEntity.ok().headers(headers).body(documentBytes);
@@ -53,6 +62,12 @@ public class DocumentController {
     public ResponseEntity<List<DocumentListDTO>> getDocuments(@PathVariable UUID userId) {
         return ResponseEntity.ok(documentService.getDocumentList(userId));
     }
+
+//    @PatchMapping("/{docId}")
+//    public ResponseEntity<DocumentDTO> updateDocument(
+//            @PathVariable UUID userId, @PathVariable UUID docId, @RequestBody DocumentPatchDTO document) {
+//        return ResponseEntity.ok(documentService.updateDocument(userId, docId, document));
+//    }
 
     /**
      * Helper method to generate filename from document data

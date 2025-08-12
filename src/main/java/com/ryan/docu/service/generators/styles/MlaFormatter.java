@@ -68,20 +68,6 @@ public class MlaFormatter implements StyleFormatter {
         return "Works Cited";
     }
 
-    @Override
-    public String[] getCitationExamples() {
-        return new String[] {
-            "\"Article title (no author).\" Website name, URL. Date accessed.",
-            "Author's Last Name, First Name. Title of Book. Edition, Publisher, Year of Publication.",
-            "MLA Handbook. 9th ed., Modern Language Association of America, 2021.",
-            "\"MLA Style.\" Excelsior Online Writing Lab, https://owl.excelsior.edu/citation-",
-            "    anddocumentation/mla-style/. Accessed 1 October 2023.",
-            "Piercy, Marge. \"For the young who want to.\" Poetry Foundation,",
-            "    https://www.poetryfoundation.org/poems/47399/for-the-young-who-want-to. Accessed 1",
-            "    October 2023."
-        };
-    }
-
     /**
      * Helper method to get value or default placeholder
      */

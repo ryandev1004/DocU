@@ -7,6 +7,8 @@ import lombok.Data;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -37,7 +39,10 @@ public class Document {
     @Enumerated(EnumType.STRING)
     private FileType fileType;
 
-    private String documentLink;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "document_citations", joinColumns = @JoinColumn(name = "doc_id"))
+    @Column(name = "citation")
+    private List<String> citations = new ArrayList<>();
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)

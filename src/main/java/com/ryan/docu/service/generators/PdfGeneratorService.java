@@ -37,7 +37,7 @@ public class PdfGeneratorService {
     }
 
     /**
-     * Generates a PDF from a DocumentCreateDTO
+     * Generates a new PDF document based on the provided DocumentCreateDTO.
      */
     public byte[] generatePDF(DocumentCreateDTO document) throws IOException {
         try (PDDocument pdfDocument = new PDDocument()) {
@@ -102,7 +102,7 @@ public class PdfGeneratorService {
                 float yPosition = newPage.getMediaBox().getHeight() - MARGIN;
                 writeHeaderNumber(contentStream, document, newPage, pdfDocument.getNumberOfPages());
                 yPosition -= DOUBLE_SPACE * 2;
-                writeWorksCited(contentStream, yPosition, document.getFormat());
+                writeWorksCited(document, contentStream, yPosition, document.getFormat());
             }
         } else {
             // Add to existing last page
@@ -111,7 +111,7 @@ public class PdfGeneratorService {
                 contentStream.setFont(FONT, FONT_SIZE);
 
                 float yPosition = lastYPosition - (DOUBLE_SPACE * 3); // Add some space
-                writeWorksCited(contentStream, yPosition, document.getFormat());
+                writeWorksCited(document, contentStream, yPosition, document.getFormat());
             }
         }
     }
@@ -173,7 +173,8 @@ public class PdfGeneratorService {
             }
 
             // Write paragraph
-            boolean shouldIndent = doc.getFormat() == Format.MLA || doc.getFormat() == null;
+            boolean shouldIndent =
+                    doc.getFormat() == Format.MLA || doc.getFormat() == null || doc.getFormat() == Format.APA;
             yPosition = writeParagraph(
                     currentStream,
                     paragraph,
@@ -195,9 +196,14 @@ public class PdfGeneratorService {
             throws IOException {
         String name = getValueOrDefault(document.getName(), "[NAME]");
         String lastName = getLastName(name);
+        String headerText;
 
         float pageWidth = page.getMediaBox().getWidth();
-        String headerText = lastName + " " + pageNumber;
+        if (document.getFormat() == Format.MLA) {
+            headerText = lastName + " " + pageNumber;
+        } else {
+            headerText = Integer.toString(pageNumber);
+        }
 
         float headerWidth = FONT.getStringWidth(headerText) / 1000 * FONT_SIZE;
         float headerX = pageWidth - MARGIN - headerWidth;
@@ -222,7 +228,8 @@ public class PdfGeneratorService {
         }
     }
 
-    private void writeWorksCited(PDPageContentStream contentStream, float startY, Format format) throws IOException {
+    private void writeWorksCited(DocumentCreateDTO doc, PDPageContentStream contentStream, float startY, Format format)
+            throws IOException {
         float yPosition = startY;
 
         // Works Cited title - centered
@@ -238,9 +245,8 @@ public class PdfGeneratorService {
         yPosition -= DOUBLE_SPACE * 2;
 
         // Citation examples
-        String[] citations = getCitationExamples(format);
+        List<String> citations = doc.getCitations();
         for (String citation : citations) {
-            // Handle long citations that might need wrapping
             if (citation.length() > 80) { // Rough estimate for line length
                 List<String> wrappedLines = wrapText(citation, 612 - (2 * MARGIN), false);
                 for (String line : wrappedLines) {
@@ -264,12 +270,6 @@ public class PdfGeneratorService {
         if (format == null) format = Format.MLA;
         StyleFormatter formatter = formatters.get(format);
         return formatter != null ? formatter.getCitationTitle() : "Works Cited";
-    }
-
-    private String[] getCitationExamples(Format format) {
-        if (format == null) format = Format.MLA;
-        StyleFormatter formatter = formatters.get(format);
-        return formatter != null ? formatter.getCitationExamples() : new String[0];
     }
 
     private int estimateParagraphLines(String text, float pageWidth) throws IOException {

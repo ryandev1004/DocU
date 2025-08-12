@@ -10,6 +10,4 @@ public interface StyleFormatter {
             throws IOException;
 
     String getCitationTitle();
-
-    String[] getCitationExamples();
 }

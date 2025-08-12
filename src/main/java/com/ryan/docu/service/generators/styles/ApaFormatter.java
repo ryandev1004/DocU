@@ -88,15 +88,6 @@ public class ApaFormatter implements StyleFormatter {
         return "References";
     }
 
-    @Override
-    public String[] getCitationExamples() {
-        return new String[] {
-            "Author, A. A. (Year). Title of work. Publisher.",
-            "Author, A. A., & Author, B. B. (Year). Title of article. Journal Name, Volume(Issue), pages.",
-            "Website Author. (Year, Month Day). Title of page. Site Name. URL"
-        };
-    }
-
     /**
      * Helper method to get value or default placeholder
      */
