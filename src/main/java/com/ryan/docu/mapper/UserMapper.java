@@ -17,5 +17,5 @@ public interface UserMapper {
 
     @Mapping(target = "userId", ignore = true)
     @Mapping(target = "documents", ignore = true)
-    User fromCreateDTO(UserCreateDTO userCreateDTO);
+    User toEntity(UserCreateDTO userCreateDTO);
 }

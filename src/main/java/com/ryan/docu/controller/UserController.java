@@ -1,6 +1,5 @@
 package com.ryan.docu.controller;
 
-import com.ryan.docu.model.dto.UserCreateDTO;
 import com.ryan.docu.model.dto.UserDTO;
 import com.ryan.docu.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -17,10 +16,6 @@ public class UserController {
 
     private final UserService userService;
 
-    @PostMapping
-    public ResponseEntity<UserDTO> createUser(@RequestBody UserCreateDTO userCreateDTO) {
-        return ResponseEntity.ok(userService.createUser(userCreateDTO));
-    }
 
     @GetMapping("/{userId}")
     public ResponseEntity<UserDTO> getUser(@PathVariable UUID userId) {

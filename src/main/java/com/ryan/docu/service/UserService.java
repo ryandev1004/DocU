@@ -21,9 +21,8 @@ public class UserService {
     private final UserRepo userRepo;
     private final UserMapper userMapper;
 
-    public UserDTO createUser(UserCreateDTO userCreateDTO) {
-        User user = userMapper.fromCreateDTO(userCreateDTO);
-        return userMapper.toDTO(userRepo.save(user));
+    public User createUser(UserCreateDTO userCreateDTO) {
+        return userRepo.save(userMapper.toEntity(userCreateDTO));
     }
 
     public UserDTO getUserById(UUID id) {
