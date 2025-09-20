@@ -1,17 +1,12 @@
 package com.ryan.docu.security.controller;
 
-import com.ryan.docu.security.model.dto.AccountCreateDTO;
-import com.ryan.docu.security.model.dto.AccountDTO;
-import com.ryan.docu.security.model.dto.AccountLoginRequestDTO;
-import com.ryan.docu.security.model.dto.AccountTokenResponseDTO;
+import com.ryan.docu.model.dto.UserDTO;
+import com.ryan.docu.security.model.dto.*;
 import com.ryan.docu.security.service.AccountService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/account")
@@ -25,8 +20,23 @@ public class AccountController {
         return ResponseEntity.ok(accountService.createAccount(account));
     }
 
+    @GetMapping
+    public ResponseEntity<AccountDTO> getAccount() {
+        return ResponseEntity.ok(accountService.getAccount());
+    }
+
+    @GetMapping("/user")
+    public ResponseEntity<UserDTO> getUserFromAccount() {
+        return ResponseEntity.ok(accountService.getUserFromAccount());
+    }
+
     @PostMapping("/login")
     public ResponseEntity<AccountTokenResponseDTO> login(@RequestBody AccountLoginRequestDTO accountLoginRequest) {
         return ResponseEntity.ok(new AccountTokenResponseDTO(accountService.login(accountLoginRequest)));
+    }
+
+    @GetMapping("/authenticated")
+    public ResponseEntity<AuthenticatedDTO> isAuthenticated() {
+        return ResponseEntity.ok().body(new AuthenticatedDTO(true));
     }
 }
