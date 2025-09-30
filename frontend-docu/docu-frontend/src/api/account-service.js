@@ -1,21 +1,18 @@
 import { api } from '../util/axios';
 
 export const accountService = {
-    // Will ping the api call on the backend that's protected by it's security config and will only return true if user has token.
-    attemptAuthenticatedRequest: async (token) => {
+    attemptAuthenticatedRequest: async () => {
         try {
-            const config = {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                }
-            };
-            const response = await api.get('/account/authenticated', config);
+            const response = await api.get('/account/authenticated');
             return {
                 authenticated: response.data.authenticated
             };
-        } catch {
-            return undefined;
+        } catch (error) {
+            // Re-throw to let store handle it
+            if (error.response?.status === 401) {
+                return { authenticated: false };
+            }
+            throw error;
         }  
     },
 
@@ -44,52 +41,48 @@ export const accountService = {
                 username: username,
                 password: password
             };
-            const response = await api.post('account/login', accountLoginRequestDTO);
-            return {
-                token: response.data.token
-            }
+            await api.post('account/login', accountLoginRequestDTO);
+            return { success: true };
         } catch (error) {
             console.error('Login API error:', error);
-            return null; // Return null instead of undefined for failed login
+            throw error; // Re-throw to let caller handle
         }
     },
     
-    getAccount: async (token) => {
+    getAccount: async () => {
         try {
-            const config = {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                }
-            };
-            const response = await api.get('/account', config);
+            const response = await api.get('/account');
             return {
                 username: response.data.username,
                 user: response.data.user
             }
-        } catch (e) {
-            console.log("Error getting account user: ", e);
-            return null;
+        } catch (error) {
+            console.log("Error getting account:", error);
+            throw error; // Re-throw to let store handle it
         }
     },
 
-    getAccountUser: async (token) => {
+    getAccountUser: async () => {
         try {
-            const config = {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                }
-            };
-            const response = await api.get('/account/user', config);
+            const response = await api.get('/account/user');
             return {
                 userId: response.data.userId,
                 username: response.data.username,
                 documents: response.data.documents
             }
-        } catch (e) {
-            console.log("Error getting account user: ", e);
-            return null;
+        } catch (error) {
+            console.log("Error getting account user:", error);
+            throw error; // Re-throw to let store handle it
+        }
+    },
+
+    logout: async () => {
+        try {
+            await api.post('/account/logout');
+            return { success: true };
+        } catch (error) {
+            console.error('Logout error:', error);
+            throw error;
         }
     }
 };

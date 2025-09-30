@@ -21,6 +21,13 @@ public class DocumentController {
 
     private final DocumentService documentService;
 
+    /**
+     * Generates a PDF document based on the provided data and returns it as a byte array in the response.
+     * @param userId
+     * @param document
+     * @return
+     * @throws IOException
+     */
     @PostMapping("/generate/{userId}")
     public ResponseEntity<byte[]> generateDocument(@PathVariable UUID userId, @RequestBody DocumentCreateDTO document)
             throws IOException {
@@ -35,6 +42,13 @@ public class DocumentController {
         return ResponseEntity.ok().headers(headers).body(documentBytes);
     }
 
+    /**
+     * Loads a previously generated document for the user based on userId and docId.
+     * @param userId
+     * @param docId
+     * @return
+     * @throws IOException
+     */
     @GetMapping("/generate/{userId}/{docId}")
     public ResponseEntity<byte[]> loadDocument(@PathVariable UUID userId, @PathVariable UUID docId) throws IOException {
         byte[] documentBytes = documentService.loadDocument(userId, docId);
@@ -63,11 +77,11 @@ public class DocumentController {
         return ResponseEntity.ok(documentService.getDocumentList(userId));
     }
 
-//    @PatchMapping("/{docId}")
-//    public ResponseEntity<DocumentDTO> updateDocument(
-//            @PathVariable UUID userId, @PathVariable UUID docId, @RequestBody DocumentPatchDTO document) {
-//        return ResponseEntity.ok(documentService.updateDocument(userId, docId, document));
-//    }
+    @DeleteMapping("/{docId}")
+    public ResponseEntity<UUID> deleteDocument(@PathVariable UUID docId) {
+        documentService.deleteDocument(docId);
+        return ResponseEntity.ok().build();
+    }
 
     /**
      * Helper method to generate filename from document data

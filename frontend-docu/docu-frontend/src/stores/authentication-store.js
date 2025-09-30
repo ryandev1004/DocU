@@ -7,77 +7,142 @@ export const useAuthenticationStore = create(
         (set, get) => ({
             currentAccount: undefined,
             currentUser: undefined,
-            token: "",
             username: "",
-            password: "",
+            isAuthenticated: false,
+            authError: null, // Track auth errors
             
             getCurrentAccount: () => get().currentAccount,
             getCurrentUser: () => get().currentUser,
-            getCurrentToken: () => get().token,
             
-            login: async () => {
-                const { username, password } = get();
+            // Login with username and password
+            login: async (username, password) => {
                 try {
-                    const tokenResponse = await accountService.login(username, password);
+                    set({ authError: null });
+                    const response = await accountService.login(username, password);
                     
-                    if (tokenResponse?.token && tokenResponse.token !== 'Failed') {
-                        set({ token: tokenResponse.token });
+                    if (response?.success) {
                         await get().fetchAccount();
+                        set({ 
+                            isAuthenticated: true,
+                            username: username,
+                            authError: null
+                        });
                         return true;
                     }
                     return false;
                 } catch (error) {
                     console.error('Login failed:', error);
+                    set({ authError: error.response?.status });
                     return false;
                 }
             },
             
+            // Fetch account details from backend
             fetchAccount: async () => {
                 try {
-                    const { token } = get();
-                    const currentAccount = await accountService.getAccount(token);
+                    set({ authError: null });
+                    const currentAccount = await accountService.getAccount();
                     if (currentAccount) {
                         set({ 
                             currentAccount,
-                            currentUser: currentAccount.user 
+                            currentUser: currentAccount.user,
+                            username: currentAccount.username,
+                            isAuthenticated: true,
+                            authError: null
                         });
+                        return true;
                     }
+                    return false;
                 } catch (error) {
                     console.error('Failed to fetch account:', error);
-                }
-            },
-            
-            isAuthenticated: async () => {
-                const { token } = get();
-                if (!token) return false;
-                
-                try {
-                    const response = await accountService.attemptAuthenticatedRequest(token);
-                    return !!(response?.authenticated);
-                } catch {
+                    const status = error.response?.status;
+                    set({ 
+                        authError: status,
+                        isAuthenticated: status !== 401 ? get().isAuthenticated : false
+                    });
+                    
+                    // If 401, clear everything
+                    if (status === 401) {
+                        get().clearStore();
+                    }
                     return false;
                 }
             },
             
-            setToken: (jwt) => set({ token: jwt }),
-            setCredentials: (username, password) => set({ username, password }),
+            // Check if user is authenticated (verifies cookie with backend)
+            checkAuthentication: async () => {
+                try {
+                    set({ authError: null });
+                    const response = await accountService.attemptAuthenticatedRequest();
+                    const authenticated = response?.authenticated || false;
+                    
+                    if (authenticated) {
+                        // If authenticated but don't have user data, fetch it
+                        if (!get().currentAccount) {
+                            const fetchSuccess = await get().fetchAccount();
+                            if (!fetchSuccess) {
+                                return false;
+                            }
+                        }
+                        set({ isAuthenticated: true, authError: null });
+                        return true;
+                    } else {
+                        // Not authenticated, clear everything
+                        get().clearStore();
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('Authentication check failed:', error);
+                    const status = error.response?.status;
+                    set({ authError: status });
+                    
+                    // If 401, definitely not authenticated
+                    if (status === 401) {
+                        get().clearStore();
+                        return false;
+                    }
+                    
+                    // For other errors, might still be authenticated
+                    return get().isAuthenticated;
+                }
+            },
+            
+            // Logout user
+            logout: async () => {
+                try {
+                    await accountService.logout();
+                } catch (error) {
+                    console.error('Logout failed:', error);
+                } finally {
+                    get().clearStore();
+                }
+            },
+            
+            // Set current user
             setCurrentUser: (user) => set({ currentUser: user }),
+            
+            // Clear all store data
             clearStore: () => set({
-                token: "",
                 currentUser: undefined,
                 currentAccount: undefined,
                 username: "",
-                password: "",
+                isAuthenticated: false,
+                authError: null,
             }),
-            logout: () => get().clearStore(),
-            isLoggedIn: () => !!get().token,
+            
+            // Check if user is logged in
+            isLoggedIn: () => get().isAuthenticated,
+            
+            // Get auth error
+            getAuthError: () => get().authError,
         }),
         {
             name: 'authentication-store',
             partialize: (state) => ({ 
-                token: state.token,
+                username: state.username,
+                isAuthenticated: state.isAuthenticated,
                 currentAccount: state.currentAccount,
-                currentUser: state.currentUser 
+                currentUser: state.currentUser
             }),
         }
     )

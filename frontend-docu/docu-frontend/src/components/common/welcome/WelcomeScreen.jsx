@@ -24,7 +24,7 @@ const WelcomeScreen = () => {
                     <p className="text-white/70">We make college essays a <i>little</i> more enjoyable.</p> 
                 </div>
                 <div className="flex items-stretch justify-between w-full max-w-2xl gap-6">
-                    <div class="bg-white rounded-lg px-12 py-14 hover:shadow-lg transition-shadow flex-1 text-center flex flex-col justify-between">
+                    <div className="bg-white rounded-lg px-12 py-14 hover:shadow-lg transition-shadow flex-1 text-center flex flex-col justify-between">
                         <div>
                             <h3 className="text-lg font-semibold text-gray-800 mb-2">Register</h3>
                             <p className="text-gray-600 text-sm mb-4">I want to start formatting!</p>
@@ -36,7 +36,7 @@ const WelcomeScreen = () => {
                             Create Account
                         </button>
                     </div>
-                    <div class="bg-white rounded-lg px-12 py-14 hover:shadow-lg transition-shadow flex-1 text-center flex flex-col justify-between">
+                    <div className="bg-white rounded-lg px-12 py-14 hover:shadow-lg transition-shadow flex-1 text-center flex flex-col justify-between">
                         <div>
                             <h3 className="text-lg font-semibold text-gray-800 mb-2">Sign In</h3>
                             <p className="text-gray-600 text-sm mb-4">I want to get back to formatting!</p>

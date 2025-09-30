@@ -25,6 +25,10 @@ public class UserService {
         return userRepo.save(userMapper.toEntity(userCreateDTO));
     }
 
+    public void save(User user) {
+        userRepo.save(user);
+    }
+
     public UserDTO getUserById(UUID id) {
         return userMapper.toDTO(userRepo.findById(id).orElse(null));
     }

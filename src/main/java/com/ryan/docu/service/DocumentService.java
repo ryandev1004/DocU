@@ -9,6 +9,7 @@ import com.ryan.docu.model.dto.DocumentListDTO;
 import com.ryan.docu.model.enums.FileType;
 import com.ryan.docu.repo.DocumentRepo;
 import com.ryan.docu.service.generators.PdfGeneratorService;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -76,10 +77,10 @@ public class DocumentService {
                 }
                 return documentBytes;
             } else {
-                throw new IllegalArgumentException("Document does not belong to the user");
+                throw new EntityNotFoundException("Document does not belong to the user");
             }
         } else {
-            throw new IllegalArgumentException("User not found");
+            throw new EntityNotFoundException("User not found");
         }
     }
 
@@ -87,7 +88,7 @@ public class DocumentService {
     public DocumentDTO createDocument(UUID userID, DocumentCreateDTO document) {
         User user = userService.findEntityById(userID);
         if (user == null) {
-            throw new IllegalArgumentException("User not found");
+            throw new EntityNotFoundException("User not found");
         }
         Document generatedDoc = documentMapper.fromCreateDTO(document);
         generatedDoc.setRelatedUser(user);
@@ -98,30 +99,22 @@ public class DocumentService {
         return documentMapper.toDTO(documentRepo.findById(documentID).orElse(null));
     }
 
-    // Pass only documentId do a findById from the documentRepo and then validate that the userId attached
-    // matches authenticated user [COME BACK TO AFTER SECURITY IMPLEMENTATION]
-    //    public DocumentDTO updateDocument(UUID userId, UUID documentID, DocumentPatchDTO documentPatch) {
-    //        User user = userService.findEntityById(userId);
-    //        if (user != null) {
-    //            Document document = documentRepo.findByRelatedUserAndDocId(user, documentID);
-    //            if (document == null) {
-    //                throw new IllegalArgumentException("Document not found");
-    //            }
-    //            documentMapper.partialUpdate(documentPatch, document);
-    //            return documentMapper.toDTO(documentRepo.save(document));
-    //        } else {
-    //            throw new IllegalArgumentException("User not found");
-    //        }
-    //    }
-
     // This method retrieves a list of documents related to a specific user.
     // The information being returned will be shown in a list format, which is why we use DocumentListDTO.
     public List<DocumentListDTO> getDocumentList(UUID userID) {
         User user = userService.findEntityById(userID);
         if (user == null) {
-            throw new IllegalArgumentException("User not found");
+            throw new EntityNotFoundException("User not found");
         }
         List<Document> documentListDTOS = documentRepo.findByRelatedUser(user);
         return documentListDTOS.stream().map(documentMapper::toListDTO).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void deleteDocument(UUID docId) {
+        Document document = documentRepo.findById(docId).orElseThrow();
+        User user = document.getRelatedUser();
+        user.getDocuments().remove(document);
+        userService.save(user);
     }
 }
