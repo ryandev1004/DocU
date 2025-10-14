@@ -1,12 +1,19 @@
 import { useNavigate } from "react-router";
+import { useAuthenticationStore } from "../../../stores/authentication-store";
 
 
 const WelcomeScreen = () => {
     const navigate = useNavigate();
+    const authenticationStore = useAuthenticationStore();
     
 
     const navigateSignIn = () => {
-        navigate('/login');
+        const auth = authenticationStore.isLoggedIn();
+            if(auth) {
+                navigate('/dashboard');
+            } else {
+                navigate('/login');
+            }
     }
 
     const navigateSignUp = () => {

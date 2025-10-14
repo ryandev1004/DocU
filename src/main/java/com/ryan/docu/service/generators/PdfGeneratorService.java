@@ -223,9 +223,13 @@ public class PdfGeneratorService {
         float centerX = (pageWidth - titleWidth) / 2;
 
         contentStream.beginText();
+        contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.TIMES_BOLD), FONT_SIZE);
         contentStream.newLineAtOffset(centerX, yPosition);
         contentStream.showText(citationTitle);
         contentStream.endText();
+
+        // Sets font back to normal for citations
+        contentStream.setFont(FONT, FONT_SIZE);
         yPosition -= DOUBLE_SPACE * 2;
 
         // Citation examples

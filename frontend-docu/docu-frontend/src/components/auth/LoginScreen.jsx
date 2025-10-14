@@ -33,6 +33,11 @@ const LoginScreen = () => {
         try {
             setIsLoading(true);
             setError('');
+
+            const auth = authenticationStore.isLoggedIn();
+            if(auth) {
+                navigate('/dashboard');
+            }
             
             const loginSuccess = await authenticationStore.login(username, password);
             
