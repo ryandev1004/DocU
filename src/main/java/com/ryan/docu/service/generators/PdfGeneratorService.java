@@ -81,43 +81,28 @@ public class PdfGeneratorService {
     }
 
     /**
-     * Fixed method to add Works Cited page without stream conflicts
+     * Adds a Works Cited page to the PDF document.
      */
     private void addWorksCitedPage(PDDocument pdfDocument, DocumentCreateDTO document, float lastYPosition)
             throws IOException {
         PDPage lastPage = pdfDocument.getPage(pdfDocument.getNumberOfPages() - 1);
 
-        // Check if we have enough space on the last page for Works Cited
-        float requiredSpace = DOUBLE_SPACE * 8; // Minimum space needed for Works Cited
-        boolean needsNewPage = lastYPosition < (MARGIN + requiredSpace);
+        // Create new page for Works Cited
+        PDPage newPage = new PDPage();
+        pdfDocument.addPage(newPage);
 
-        if (needsNewPage) {
-            // Create new page for Works Cited
-            PDPage newPage = new PDPage();
-            pdfDocument.addPage(newPage);
+        try (PDPageContentStream contentStream = new PDPageContentStream(pdfDocument, newPage)) {
+            contentStream.setFont(FONT, FONT_SIZE);
 
-            try (PDPageContentStream contentStream = new PDPageContentStream(pdfDocument, newPage)) {
-                contentStream.setFont(FONT, FONT_SIZE);
-
-                float yPosition = newPage.getMediaBox().getHeight() - MARGIN;
-                writeHeaderNumber(contentStream, document, newPage, pdfDocument.getNumberOfPages());
-                yPosition -= DOUBLE_SPACE * 2;
-                writeWorksCited(document, contentStream, yPosition, document.getFormat());
-            }
-        } else {
-            // Add to existing last page
-            try (PDPageContentStream contentStream =
-                    new PDPageContentStream(pdfDocument, lastPage, PDPageContentStream.AppendMode.APPEND, true)) {
-                contentStream.setFont(FONT, FONT_SIZE);
-
-                float yPosition = lastYPosition - (DOUBLE_SPACE * 3); // Add some space
-                writeWorksCited(document, contentStream, yPosition, document.getFormat());
-            }
+            float yPosition = newPage.getMediaBox().getHeight() - MARGIN;
+            writeHeaderNumber(contentStream, document, newPage, pdfDocument.getNumberOfPages());
+            yPosition -= DOUBLE_SPACE * 2;
+            writeWorksCited(document, contentStream, yPosition, document.getFormat());
         }
     }
 
     /**
-     * Modified writeBodyText method to return final Y position and handle streams properly
+     * Writes the body text to the PDF, handling pagination as needed.
      */
     private float writeBodyText(
             PDDocument document, PDPageContentStream contentStream, DocumentCreateDTO doc, float startY)
@@ -141,7 +126,7 @@ public class PdfGeneratorService {
         }
 
         float yPosition = startY - DOUBLE_SPACE;
-        PDPage currentPage = document.getPage(0); // Start with first page
+        PDPage currentPage = document.getPage(0);
         PDPageContentStream currentStream = contentStream;
         boolean isOriginalStream = true;
 
@@ -183,7 +168,6 @@ public class PdfGeneratorService {
                     shouldIndent);
         }
 
-        // Close additional streams, but not the original one (it will be closed by try-with-resources)
         if (!isOriginalStream) {
             currentStream.close();
         }

@@ -104,7 +104,6 @@ public class ApaFormatter implements StyleFormatter {
 
     /**
      * Format date according to APA standards (Month Day, Year)
-     * Example: March 15, 2024
      */
     private String formatDate(DocumentCreateDTO document) {
         if (document.getDate() != null && !document.getDate().trim().isEmpty()) {

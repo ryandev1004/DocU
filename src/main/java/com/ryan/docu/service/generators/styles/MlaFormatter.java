@@ -77,7 +77,6 @@ public class MlaFormatter implements StyleFormatter {
 
     /**
      * Format date according to MLA standards (Day Month Year)
-     * Example: 15 March 2024
      */
     private String formatDate(DocumentCreateDTO document) {
         if (document.getDate() != null && !document.getDate().trim().isEmpty()) {
