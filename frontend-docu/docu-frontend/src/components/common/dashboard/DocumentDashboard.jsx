@@ -154,11 +154,11 @@ const DocumentDashboard = () => {
                     </div>
                 </div>
             </div>
-            <CreateDocumentModal
+            {isModalOpen && (<CreateDocumentModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onCreateDocument={handleCreateDocument}
-            />
+            />)}
         </div>
     );
 }
